@@ -1,0 +1,145 @@
+FUNCTION zfm_11216_cpi_demo.
+*"----------------------------------------------------------------------
+*"*"本地接口：
+*"  IMPORTING
+*"     VALUE(IV_OPERATION) TYPE  STRING OPTIONAL
+*"     VALUE(IV_ID) TYPE  STRING OPTIONAL
+*"     VALUE(IV_NUMBER) TYPE  STRING OPTIONAL
+*"  EXPORTING
+*"     VALUE(EV_RESULT) TYPE  STRING
+*"----------------------------------------------------------------------
+   DATA: lo_http_client  TYPE REF TO if_http_client,
+         lv_url          TYPE string,
+         lv_result       TYPE string,
+         lv_token        TYPE string,
+         lv_json         TYPE string,
+         lv_session      TYPE string.
+
+   "确定调用URL
+   CASE iv_operation.
+     WHEN 'BOOK'.
+       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/book'.
+     WHEN 'AUTHOR'.
+       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/author'.
+     WHEN 'ORDER' OR 'GET_ORDER'.
+       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/orderdynam'.
+     WHEN OTHERS.
+   ENDCASE.
+
+   "创建HTTP对象
+   cl_http_client=>create_by_url(
+        EXPORTING
+          url                = lv_url
+        IMPORTING
+          client             = lo_http_client
+        EXCEPTIONS
+          argument_not_found = 1
+          plugin_not_active  = 2
+          internal_error     = 3
+          OTHERS             = 4 ).
+
+   "认证信息
+   lo_http_client->authenticate(
+     EXPORTING
+       username = 'sb-e023cbd8-8f21-4b32-8ac1-13430795123a!b257759|it-rt-31c63ad4trial!b55215'
+       password = '7f7785eb-4e7e-4e0c-9c28-968d54ab8ffd$T0bGDnxiPV_nND2lGhggY5dJqmAItKNWXb2XWbpegbY='
+   ).
+
+   "设置Content-Type
+   lo_http_client->request->set_header_field(
+     EXPORTING
+       name  = 'Content-Type'
+       value = 'application/json').
+
+   "设置调用方法
+   lo_http_client->request->set_method( 'GET' ).
+
+   "下订单方法为POST，使用CSRF则需先获取token
+   IF iv_operation ='ORDER'.
+
+     "获取token
+     lo_http_client->request->set_header_field(
+       EXPORTING
+         name  = 'X-CSRF-Token'
+         value = 'fetch' ).
+
+     "启用cookie
+     lo_http_client->propertytype_accept_cookie = if_http_client=>co_enabled.
+
+     "第一次调用，获取token
+     lo_http_client->send(
+       EXCEPTIONS
+         http_communication_failure = 1
+         http_invalid_state         = 2 ).
+
+     lo_http_client->receive(
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3 ).
+
+     "获取返回的token
+     lv_token = lo_http_client->response->get_header_field('X-CSRF-Token').
+
+
+     "获取cookie
+     lv_session  = lo_http_client->response->get_header_field('set-cookie').
+
+     IF lv_token IS NOT INITIAL.
+
+       ""设置Content-Type
+       lo_http_client->request->set_header_field(
+         EXPORTING
+           name  = 'Content-Type'
+           value = 'application/json').
+
+
+       "设置token
+       lo_http_client->request->set_header_field(
+         EXPORTING
+           name  = 'X-CSRF-Token'
+           value = lv_token ).
+
+       "设置cookie
+       lo_http_client->request->set_form_field(
+         EXPORTING
+           name  = 'Cookie'
+           value =   lv_session ).
+
+       "拼接json报文
+       lv_json = '{"book_ID":' && iv_id && ',"amount": ' && iv_number && '}'.
+
+       "设置body
+       lo_http_client->request->set_cdata(
+         EXPORTING
+           data = lv_json
+       ).
+
+       "设置调用方法
+       lo_http_client->request->set_method( 'POST' ).
+
+     ENDIF.
+
+   ENDIF.
+
+   "调用接口
+   lo_http_client->send(
+     EXCEPTIONS
+       http_communication_failure = 1
+       http_invalid_state         = 2 ).
+
+   IF sy-subrc <> 0.
+     lo_http_client->get_last_error( IMPORTING message = ev_result ).
+*    ev_result = lv_message.
+   ENDIF.
+
+   "获取返回信息
+   lo_http_client->receive(
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3 ).
+
+   ev_result = lo_http_client->response->get_cdata( ).
+
+ENDFUNCTION.
