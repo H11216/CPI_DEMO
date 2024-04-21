@@ -18,11 +18,11 @@ FUNCTION zfm_11216_cpi_demo.
    "确定调用URL
    CASE iv_operation.
      WHEN 'BOOK'.
-       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/book'.
+       lv_url = 'url1'.
      WHEN 'AUTHOR'.
-       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/author'.
+       lv_url = 'url2'.
      WHEN 'ORDER' OR 'GET_ORDER'.
-       lv_url = 'https://31c63ad4trial.it-cpitrial06-rt.cfapps.us10-001.hana.ondemand.com/http/orderdynam'.
+       lv_url = 'url3'.
      WHEN OTHERS.
    ENDCASE.
 
